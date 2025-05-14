@@ -12,12 +12,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
+import org.phoebus.pv.PVFactory;
 import org.epics.vtype.Array;
 import org.epics.vtype.VType;
 import org.phoebus.pv.PV;
 import org.phoebus.pv.PVPool;
+import org.phoebus.pv.RefCountMap.ReferencedEntry;
+
+import java.lang.reflect.Field;
 
 import io.reactivex.rxjava3.disposables.Disposable;
+import java.util.Map;
+
+
 
 /** Web socket PV
  *
@@ -45,7 +52,7 @@ public class WebSocketPV
     private volatile boolean subscribed_for_array = false;
     private volatile VType last_value = null;
     private volatile Boolean last_readonly = null;
-
+    private static boolean isAcsys = false;
     static
     {
         String spec = System.getenv("PV_THROTTLE_MS");
@@ -63,9 +70,9 @@ public class WebSocketPV
         spec = System.getenv("PV_WRITE_SUPPORT");
         PV_WRITE_SUPPORT = "true".equalsIgnoreCase(spec);
 
-        logger.log(Level.INFO, "PV_THROTTLE_MS = " + THROTTLE_MS);
-        logger.log(Level.INFO, "PV_ARRAY_THROTTLE_MS = " + ARRAY_THROTTLE_MS);
-        logger.log(Level.INFO, "PV_WRITE_SUPPORT = " + PV_WRITE_SUPPORT);
+        logger.log(Level.FINE, "PV_THROTTLE_MS = " + THROTTLE_MS);
+        logger.log(Level.FINER, "PV_ARRAY_THROTTLE_MS = " + ARRAY_THROTTLE_MS);
+        logger.log(Level.FINE, "PV_WRITE_SUPPORT = " + PV_WRITE_SUPPORT);
     }
 
     /** @param name PV name
@@ -90,7 +97,35 @@ public class WebSocketPV
     public void start() throws Exception
     {
         subscribed_for_array = false;
+
+        logger.log(Level.INFO, "start PV "+" " + name+" isAcsys="+isAcsys);
+    
+
+        if ((name.startsWith("acsys") || name.startsWith("ACSYS")) && !isAcsys)
+        {
+            isAcsys = true;
+            //pv = org.phoebus.pv.acsys.ACsys_PV.fetchDevice(name.substring(8), name.substring(8));
+            //pv = PVPool.createPV(new org.phoebus.pv.acsys.ACsys_PVFactory() ,name.substring(8), name.substring(8));         
+            //Method createPVMethod = PVPool.class.getDeclaredMethod("createPV", PVFactory.class, String.class, String.class);
+            //createPVMethod.setAccessible(true); // Bypass private access
+            //pv = (PV) createPVMethod.invoke(new org.phoebus.pv.acsys.ACsys_PVFactory(), name.substring(8), name.substring(8)); // Updated base_name to name.substring(8)
+    
+
+            Field factoriesField = PVPool.class.getDeclaredField("factories");
+            factoriesField.setAccessible(true);
+    
+            @SuppressWarnings("unchecked")
+            Map<String, PVFactory> factories = (Map<String, PVFactory>) factoriesField.get(null);
+            factories.put("acsys", new org.phoebus.pv.acsys.ACsys_PVFactory());
+    
+            logger.log(Level.INFO, "Manually registered PV type acsys:// with factory ACsys_PVFactory");
+            logger.log(Level.FINER, "PV name: " + name);
+            logger.log(Level.FINER, "Current factories: " + factories.keySet());
+
+        } 
+        
         pv = PVPool.getPV(name);
+          
         // Subscribe at the 'normal' throttling rate.
         subscription.set(pv.onValueEvent()
                            .throttleLatest(THROTTLE_MS, TimeUnit.MILLISECONDS)
@@ -98,6 +133,7 @@ public class WebSocketPV
         subscription_access.set(pv.onAccessRightsEvent()
                                    .throttleLatest(THROTTLE_MS, TimeUnit.MILLISECONDS)
                                    .subscribe(this::handleAccessChanges));
+        
     }
 
     /** Handle change in value
