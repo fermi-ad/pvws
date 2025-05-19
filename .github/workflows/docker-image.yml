@@ -20,10 +20,33 @@ jobs:
         run: |
           echo "GITHUB_USERNAME=${{ github.actor }}" >> $GITHUB_ENV
           echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+   
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build using Docker Compose
-        run: |
-          docker compose build \
-            --build-arg GITHUB_USERNAME=$GITHUB_USERNAME \
-            --build-arg GITHUB_TOKEN=$GITHUB_TOKEN
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: adregistry.fnal.gov/epics/pvws
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=v${{ github.run_number }},enable={{is_default_branch}}
+            type=raw,value=dev${{ github.run_number }},enable=${{ github.ref_name == 'fnal-dev'}}
+  
+      - name: Log in to Docker Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: adregistry.fnal.gov
+          username: ${{ secretsADREGISTRY_EPICS_USERNAME }}
+          password: ${{ secrets.ADREGISTRY_EPICS_SECRET }}
 
+
+      - name: Building Docker image and pushing to adregistry
+        uses: docker/build-push-action@v4
+        with:
+          context: docker
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
