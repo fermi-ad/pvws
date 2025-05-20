@@ -15,11 +15,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
-      - name: Set up environment variables
-        run: |
-          echo "GITHUB_USERNAME=${{ github.actor }}" >> $GITHUB_ENV
-          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
    
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -48,8 +43,8 @@ jobs:
         with:
           context: docker
           build-args: |
-            GITHUB_USERNAME=$GITHUB_USERNAME
-            GITHUB_TOKEN=$GITHUB_TOKEN
+            GITHUB_USERNAME=${{ github.actor }}
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
