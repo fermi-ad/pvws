@@ -27,7 +27,7 @@ RUN mvn clean package -DskipTests
 # === Stage 3: Package app with Tomcat ===
 FROM tomcat:9.0-jdk17
 
-ARG PORT_NUMBER=8080
+ARG PORT_NUMBER=8081
 
 # Copy WAR file
 COPY --from=maven_builder /pvws/target/pvws.war ${CATALINA_HOME}/webapps/pvws.war
