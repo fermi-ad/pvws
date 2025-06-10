@@ -2,7 +2,9 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ fnal ]
+    branches:
+      - fnal  
+      - fnal-dev
   pull_request:
     branches: [ fnal ]
 
